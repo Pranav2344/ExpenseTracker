@@ -1,0 +1,290 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.Date;
+
+public class ExpenseTrackerGUI {
+
+    static ArrayList<Expense> expenses = new ArrayList<>();
+    static double totalIncome = 0;
+    static ArrayList<SavingsGoal> savingsGoals = new ArrayList<>();
+    static double remainingBalance = 0;
+
+    private static final String DATABASE_FILE = "database.txt"; // Path to database file
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                createAndShowGUI();
+                loadDatabase();  // Load data from the file at startup
+            }
+        });
+    }
+
+    // Create and display the GUI
+    private static void createAndShowGUI() {
+        JFrame frame = new JFrame("Expense Tracker");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(600, 400);
+        frame.setLayout(new BorderLayout());
+
+        // Create the main panel
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridLayout(5, 1)); // Vertical layout for buttons
+
+        // Buttons with hover effect
+        JButton btnAddIncome = createButton("Add Income");
+        JButton btnAddExpense = createButton("Add Expense");
+        JButton btnViewExpenses = createButton("View Expenses");
+        JButton btnViewSummary = createButton("View Summary");
+        JButton btnSetSavingsGoal = createButton("Set Savings Goal");
+
+        // Button actions
+        btnAddIncome.addActionListener(e -> addIncomeAction());
+        btnAddExpense.addActionListener(e -> addExpenseAction());
+        btnViewExpenses.addActionListener(e -> viewExpensesAction());
+        btnViewSummary.addActionListener(e -> viewSummaryAction());
+        btnSetSavingsGoal.addActionListener(e -> setSavingsGoalAction());
+
+        // Add buttons to the panel
+        panel.add(btnAddIncome);
+        panel.add(btnAddExpense);
+        panel.add(btnViewExpenses);
+        panel.add(btnViewSummary);
+        panel.add(btnSetSavingsGoal);
+
+        // Add panel to the frame
+        frame.add(panel, BorderLayout.CENTER);
+
+        // Display the frame with animation (fade-in effect)
+        frame.setVisible(true);
+        fadeIn(frame);
+    }
+
+    // Create a button with hover effect
+    private static JButton createButton(String text) {
+        JButton button = new JButton(text);
+        button.setFocusPainted(false);
+        button.setBackground(Color.LIGHT_GRAY);
+        button.setFont(new Font("Arial", Font.PLAIN, 16));
+
+        // Hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(Color.CYAN);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(Color.LIGHT_GRAY);
+            }
+        });
+
+        return button;
+    }
+
+    // Add fade-in effect
+    private static void fadeIn(JFrame frame) {
+        final Timer timer = new Timer(10, null);
+        timer.addActionListener(new ActionListener() {
+            private float opacity = 0.0f;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (opacity < 1.0f) {
+                    opacity += 0.05f;
+                    frame.setOpacity(opacity);
+                } else {
+                    timer.stop();
+                }
+            }
+        });
+        timer.start();
+    }
+
+    // Add Income action
+    private static void addIncomeAction() {
+        String incomeInput = JOptionPane.showInputDialog(null, "Enter income amount:");
+        if (incomeInput != null) {
+            try {
+                double income = Double.parseDouble(incomeInput);
+                totalIncome += income;
+                updateRemainingBalance();
+                JOptionPane.showMessageDialog(null, "Income added successfully. Remaining Balance: " + remainingBalance);
+                saveDatabase(); // Save after adding income
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(null, "Invalid input. Please enter a valid number.");
+            }
+        }
+    }
+
+    // Add Expense action
+    private static void addExpenseAction() {
+        JPanel panel = new JPanel(new GridLayout(3, 2));
+        JTextField categoryField = new JTextField();
+        JTextField amountField = new JTextField();
+        JTextField descriptionField = new JTextField();
+        panel.add(new JLabel("Category:"));
+        panel.add(categoryField);
+        panel.add(new JLabel("Amount:"));
+        panel.add(amountField);
+        panel.add(new JLabel("Description:"));
+        panel.add(descriptionField);
+
+        int option = JOptionPane.showConfirmDialog(null, panel, "Enter Expense Details", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.OK_OPTION) {
+            String category = categoryField.getText();
+            String description = descriptionField.getText();
+            try {
+                double amount = Double.parseDouble(amountField.getText());
+                expenses.add(new Expense(category, amount, description));
+                updateRemainingBalance();
+                JOptionPane.showMessageDialog(null, "Expense added successfully. Remaining Balance: " + remainingBalance);
+                saveDatabase(); // Save after adding expense
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(null, "Invalid input. Please enter a valid amount.");
+            }
+        }
+    }
+
+    // View Expenses action
+    private static void viewExpensesAction() {
+        String[] columnNames = {"Date", "Category", "Amount", "Description"};
+        Object[][] data = new Object[expenses.size()][4];
+
+        for (int i = 0; i < expenses.size(); i++) {
+            Expense expense = expenses.get(i);
+            data[i][0] = expense.date;
+            data[i][1] = expense.category;
+            data[i][2] = expense.amount;
+            data[i][3] = expense.description;
+        }
+
+        JTable table = new JTable(data, columnNames);
+        JScrollPane scrollPane = new JScrollPane(table);
+        JOptionPane.showMessageDialog(null, scrollPane, "View Expenses", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    // View Summary action
+    private static void viewSummaryAction() {
+        double totalExpenses = 0;
+        for (Expense expense : expenses) {
+            totalExpenses += expense.amount;
+        }
+        double balance = totalIncome - totalExpenses;
+        JOptionPane.showMessageDialog(null, "Total Income: " + totalIncome + "\nTotal Expenses: " + totalExpenses + "\nRemaining Balance: " + balance);
+    }
+
+    // Set Savings Goal action
+    private static void setSavingsGoalAction() {
+        JPanel panel = new JPanel(new GridLayout(2, 2));
+        JTextField goalNameField = new JTextField();
+        JTextField targetAmountField = new JTextField();
+        panel.add(new JLabel("Goal Name:"));
+        panel.add(goalNameField);
+        panel.add(new JLabel("Target Amount:"));
+        panel.add(targetAmountField);
+
+        int option = JOptionPane.showConfirmDialog(null, panel, "Set Savings Goal", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.OK_OPTION) {
+            String goalName = goalNameField.getText();
+            try {
+                double targetAmount = Double.parseDouble(targetAmountField.getText());
+                SavingsGoal goal = new SavingsGoal(goalName, targetAmount);
+                savingsGoals.add(goal);
+                JOptionPane.showMessageDialog(null, "Savings goal '" + goalName + "' set to: " + targetAmount);
+                saveDatabase(); // Save after setting goal
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(null, "Invalid input. Please enter a valid number.");
+            }
+        }
+    }
+
+    // Update remaining balance after income or expense
+    private static void updateRemainingBalance() {
+        double totalExpenses = 0;
+        for (Expense expense : expenses) {
+            totalExpenses += expense.amount;
+        }
+        remainingBalance = totalIncome - totalExpenses;
+    }
+
+    // Expense class
+    static class Expense {
+        String category;
+        double amount;
+        String description;
+        Date date;
+
+        public Expense(String category, double amount, String description) {
+            this.category = category;
+            this.amount = amount;
+            this.description = description;
+            this.date = new Date();
+        }
+    }
+
+    // SavingsGoal class
+    static class SavingsGoal {
+        String goalName;
+        double targetAmount;
+        double currentAmount;
+
+        public SavingsGoal(String goalName, double targetAmount) {
+            this.goalName = goalName;
+            this.targetAmount = targetAmount;
+            this.currentAmount = 0;
+        }
+
+        public void addSavings(double amount) {
+            this.currentAmount += amount;
+        }
+    }
+
+    // Load data from the database file
+    private static void loadDatabase() {
+        try (BufferedReader reader = new BufferedReader(new FileReader(DATABASE_FILE))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(":");
+                if (parts[0].equals("INCOME")) {
+                    totalIncome = Double.parseDouble(parts[1]);
+                } else if (parts[0].equals("EXPENSE")) {
+                    String category = parts[1];
+                    double amount = Double.parseDouble(parts[2]);
+                    String description = parts[3];
+                    expenses.add(new Expense(category, amount, description));
+                } else if (parts[0].equals("SAVINGS_GOAL")) {
+                    String goalName = parts[1];
+                    double targetAmount = Double.parseDouble(parts[2]);
+                    savingsGoals.add(new SavingsGoal(goalName, targetAmount));
+                }
+            }
+            updateRemainingBalance(); // Update remaining balance from loaded data
+        } catch (IOException e) {
+            System.out.println("Error loading database: " + e.getMessage());
+        }
+    }
+
+    // Save data to the database file
+    private static void saveDatabase() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(DATABASE_FILE))) {
+            writer.write("INCOME:" + totalIncome);
+            writer.newLine();
+            for (Expense expense : expenses) {
+                writer.write("EXPENSE:" + expense.category + ":" + expense.amount + ":" + expense.description + ":" + expense.date);
+                writer.newLine();
+            }
+            for (SavingsGoal savingsGoal : savingsGoals) {
+                writer.write("SAVINGS_GOAL:" + savingsGoal.goalName + ":" + savingsGoal.targetAmount + ":" + savingsGoal.currentAmount);
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.out.println("Error saving database: " + e.getMessage());
+        }
+    }
+}
